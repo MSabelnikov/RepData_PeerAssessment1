@@ -1,25 +1,131 @@
----
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
----
+Peer Assessment 1 of Reproducible Research course on Coursera
+by M. Sabelnikov
 
 
 ## Loading and preprocessing the data
+Loading packages adn setting time settings
+```{r, results='hide',message=FALSE}
+library(dplyr)
+library(data.table)
+library(ggplot2)
+Sys.setlocale("LC_TIME", "USA")
+```
+Reading data from CSV in working directory:
+```{r}
+data<-read.csv("activity.csv")
+```
 
+Checking the structure of the data:
 
-
+```{r}
+str(data)
+```
 ## What is mean total number of steps taken per day?
 
+Calculating mean, sum and median by day
+```{r}
+mean_steps<-data %>% group_by(date) %>% summarize(steps=mean(steps,na.rm=T))
+sum_steps<-data %>% group_by(date) %>% summarize(steps=sum(steps,na.rm=T))
+median_steps<-data %>% group_by(date) %>% summarize(steps=median(steps,na.rm=T))
+```
+Make a histogram of the total number of steps taken each day
+```{r}
+hist(sum_steps$steps,main="Sum of steps by day (Without NA values)",xlab="Steps")
+```
 
+Mean and meadian steps by day table
+```{r}
+mean_steps<-data.table(mean_steps)
+mean_steps<-cbind(mean_steps,median_steps$steps)
+setnames(mean_steps,c("date","mean","median"))
+mean_steps
+```
+
+Mean number of steps is **`r mean(data$steps,na.rm=T)`**  
+Median number of steps is **`r median(data$steps,na.rm=T)`**
 
 ## What is the average daily activity pattern?
+Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
 
+Cleaning data
+```{r}
+data_clean1<-complete.cases(data$steps)
+data_clean<-data[data_clean1,]
+```
 
+Calculating summary table and plotting
+```{r}
+interval<-group_by(data_clean,interval)
+int<-summarize(interval,steps=mean(steps))
+plot(int$interval,int$steps,type="l",xlab="Interval",ylab="Steps")
+```
+
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+m<-int[int$steps==max(int$steps),1]
+```
+
+The interval with maximum number of steps is interval # **`r m`**
 
 ## Imputing missing values
+Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+```{r}
+nas<-table(data_clean1)
+```
+The total number of missing values in the dataset is **`r as.integer(nas[1])`**
 
+Filling in all of the missing values in the dataset
 
+```{r}
+data_wo_nas <-merge(data,int,by="interval")
+
+id<-1:17568
+for (i in id){
+        if (is.na(data_wo_nas[i,2])){
+                data_wo_nas[i,2]<-data_wo_nas[i,4]}
+        else {}
+        
+}
+
+```
+
+Create a new dataset that is equal to the original dataset but with the missing data filled in.
+```{r}
+data_new<-select(data_wo_nas,steps=steps.x,interval,date)
+```
+
+Make a histogram of the total number of steps taken each day
+```{r}
+sum_steps_new<-data_new %>% group_by(date) %>% summarize(steps=sum(steps,na.rm=T))
+hist(sum_steps_new$steps,main="Sum of steps by day (with NAs reaplaces by mean)",xlab="Steps")
+```
+  
+**Here is initial histogram**
+```{r}
+hist(sum_steps$steps,main="Sum of steps by day (Without NA values)",xlab="Steps")
+```
+
+Mean number of steps in data with NAs replaced is **`r mean(data_new$steps,na.rm=T)`**  
+Median number of steps in data with NAs replaced is **`r median(data_new$steps,na.rm=T)`**  
+
+As we can see total mean didn't change from the estimation of the 1st part of assignment.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+Adding column with weekdays
+```{r}
+data_new$weekday<-weekdays(as.Date(data_new$date))
+data_new$weekday<-ifelse(data_new$weekday %in% c("Saturday", "Sunday"),"weekend", "weekday")
+```
+
+Calculate averages and plot.
+```{r}
+data_new2<-data_new %>% group_by(interval,weekday) %>% summarize(steps=mean(steps,na.rm=T))
+ggplot(data_new2, aes(x=interval, y=steps, fill=weekday)) +
+        geom_line(stat="identity") + 
+        facet_grid(weekday  ~ ., scales="free") +
+        ylab("Steps") + 
+        xlab("Intervals") +
+        ggtitle(expression("Average number of steps taken"))
+
+```
